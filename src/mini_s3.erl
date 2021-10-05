@@ -403,6 +403,7 @@ expiration_time(TimeToLive) ->
     Now = calendar:datetime_to_gregorian_seconds(mini_s3:universaltime()),
     (Now - ?EPOCH) + TimeToLive.
 
+
 -spec get_object(string(), string(), proplists:proplist(), aws_config()) -> proplists:proplist().
 get_object(BucketName, Key, Options, Config) ->
     erlcloud_s3:get_object(BucketName, Key, Options, Config).
