@@ -54,7 +54,13 @@
          set_bucket_attribute/3,
          set_bucket_attribute/4,
          set_object_acl/3,
-         set_object_acl/4
+         set_object_acl/4,
+         get_bucket_lifecycle/1,
+         get_bucket_lifecycle/2,
+         put_bucket_lifecycle/2,
+         put_bucket_lifecycle/3,
+         delete_bucket_lifecycle/1,
+         delete_bucket_lifecycle/2
 ]).
 
 -export([make_authorization/10,
@@ -116,6 +122,15 @@
 
 -type bucket_access_type() :: vhost | path.
 
+-type bucket_lifecycle_rule_field() :: id
+                                     | status
+                                     | filter
+                                     | expiration_days
+                                     | non_current_version_expiration_days.
+
+-type bucket_lifecycle_rule() :: [{bucket_lifecycle_rule_field(), term()}].
+
+%%
 %% This is a helper function that exists to make development just a
 %% wee bit easier
 -spec manual_start() -> ok.
@@ -458,6 +473,30 @@ set_bucket_attribute(BucketName, AttributeName, Value) ->
 -spec set_bucket_attribute(string(), atom(), term(), aws_config()) -> ok.
 set_bucket_attribute(BucketName, AttributeName, Value, Config) ->
     erlcloud_s3:set_bucket_attribute(BucketName, AttributeName, Value, Config).
+
+-spec get_bucket_lifecycle(string()) -> [bucket_lifecycle_rule()].
+get_bucket_lifecycle(BucketName) ->
+    erlcloud_s3:get_bucket_lifecycle(BucketName).
+
+-spec get_bucket_lifecycle(string(), aws_config()) -> [bucket_lifecycle_rule()].
+get_bucket_lifecycle(BucketName, Config) ->
+    erlcloud_s3:get_bucket_lifecycle(BucketName, Config).
+
+-spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()]) -> term().
+put_bucket_lifecycle(BucketName, Rules) ->
+    erlcloud_s3:put_bucket_lifecycle(BucketName, Rules).
+
+-spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()], aws_config()) -> term().
+put_bucket_lifecycle(BucketName, Rules, Config) ->
+    erlcloud_s3:put_bucket_lifecycle(BucketName, Rules, Config).
+
+-spec delete_bucket_lifecycle(string()) -> term().
+delete_bucket_lifecycle(BucketName) ->
+    erlcloud_s3:delete_bucket_lifecycle(BucketName).
+
+-spec delete_bucket_lifecycle(string(), aws_config()) -> term().
+delete_bucket_lifecycle(BucketName, Config) ->
+    erlcloud_s3:delete_bucket_lifecycle(BucketName, Config).
 
 make_authorization(AccessKeyId, SecretKey, Method, ContentMD5, ContentType, Date, AmzHeaders,
                    Host, Resource, Subresource) ->
