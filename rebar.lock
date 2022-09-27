@@ -13,7 +13,11 @@
  {<<"lhttpc">>,
   {git,"https://github.com/erlcloud/lhttpc",
        {ref,"8e34985a3cd0ac2a7fc2a88a041554c64d33e74b"}},
-  1}]}.
+  1},
+ {<<"recon">>,
+  {git,"git@github.com:kivra/recon.git",
+       {ref,"34194da6d9f8ed25f274e0ebb098dc9e95bcf547"}},
+  0}]}.
 [
 {pkg_hash,[
  {<<"base16">>, <<"283644E2B21BD5915ACB7178BED7851FB07C6E5749B8FAD68A53C501092176D9">>},
