@@ -58,7 +58,13 @@
          put_object/5,
          put_object/6,
          set_object_acl/3,
-         set_object_acl/4]).
+         set_object_acl/4,
+         get_bucket_lifecycle/1,
+         get_bucket_lifecycle/2,
+         put_bucket_lifecycle/2,
+         put_bucket_lifecycle/3,
+         delete_bucket_lifecycle/1,
+         delete_bucket_lifecycle/2]).
 
 -export([manual_start/0,
          make_authorization/10,
@@ -67,7 +73,6 @@
 
 -ifdef(TEST).
 -compile([export_all]).
--include_lib("eunit/include/eunit.hrl").
 -endif.
 
 -include("internal.hrl").
@@ -104,6 +109,13 @@
                              | us_west_1
                              | eu.
 
+-type bucket_lifecycle_rule_field() :: id
+                                     | status
+                                     | filter
+                                     | expiration_days
+                                     | non_current_version_expiration_days.
+
+-type bucket_lifecycle_rule() :: [{bucket_lifecycle_rule_field(), term()}].
 
 %%
 %% This is a helper function that exists to make development just a
@@ -844,6 +856,89 @@ encode_grant(Grant) ->
         {'DisplayName', [proplists:get_value(display_name, proplists:get_value(owner, Grantee))]}]},
       {'Permission', [encode_permission(proplists:get_value(permission, Grant))]}]}.
 
+-spec get_bucket_lifecycle(string()) -> [bucket_lifecycle_rule()].
+get_bucket_lifecycle(BucketName) ->
+    get_bucket_lifecycle(BucketName, default_config()).
+
+-spec get_bucket_lifecycle(string(), config()) -> [bucket_lifecycle_rule()].
+get_bucket_lifecycle(BucketName, Config) ->
+    Doc = s3_xml_request(Config, get, "", [$/|BucketName], "lifecycle", [], <<>>, []),
+    decode_lifecycle_config(Doc).
+
+decode_lifecycle_config(Config) ->
+    Attributes = [
+                  {
+                   lifecycle_rules,
+                   "//LifecycleConfiguration/Rule",
+                   fun extract_lifecycle_rules/1
+                  }
+                 ],
+    proplists:get_value(lifecycle_rules, ms3_xml:decode(Attributes, Config)).
+
+extract_lifecycle_rules(Rules) ->
+    extract_lifecycle_rules(Rules, []).
+
+extract_lifecycle_rules([], Parsed) -> Parsed;
+extract_lifecycle_rules([Rule | Rules], Parsed) ->
+    Attributes = [
+                  {id, "ID", text},
+                  {status, "Status", text},
+                  {filter, "Filter", text},
+                  {expiration_days, "Expiration/Days", text},
+                  {
+                   non_current_version_expiration_days,
+                   "NoncurrentVersionExpiration/NoncurrentDays",
+                   text
+                  }
+                 ],
+    extract_lifecycle_rules(Rules, [ms3_xml:decode(Attributes, Rule) | Parsed]).
+
+-spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()]) -> term().
+put_bucket_lifecycle(BucketName, Rules) ->
+    put_bucket_lifecycle(BucketName, Rules, default_config()).
+
+-spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()], config()) -> term().
+put_bucket_lifecycle(BucketName, Rules, Config) ->
+    XmlRules = encode_lifecycle_config(Rules),
+    POSTData = {XmlRules, "application/xml"},
+    s3_simple_request(Config, put, "", [$/|BucketName], "lifecycle", [], POSTData, []).
+
+-spec delete_bucket_lifecycle(string()) -> term().
+delete_bucket_lifecycle(BucketName) ->
+    delete_bucket_lifecycle(BucketName, default_config()).
+
+-spec delete_bucket_lifecycle(string(), config()) -> term().
+delete_bucket_lifecycle(BucketName, Config) ->
+    s3_simple_request(Config, delete, "", [$/|BucketName], "lifecycle", [], <<>>, []).
+
+encode_lifecycle_config(Rules) ->
+    XML = {'LifecycleConfiguration', encode_lifecycle_rules(Rules, [])},
+    list_to_binary(xmerl:export_simple([XML], xmerl_xml)).
+
+encode_lifecycle_rules([], Encoded) ->
+    Encoded;
+encode_lifecycle_rules([Rule | Rules], Encoded) ->
+    Id = proplists:get_value(id, Rule),
+    Status = proplists:get_value(status, Rule, "Enabled"),
+    Filter = proplists:get_value(filter, Rule, []),
+    ExpirationDays = proplists:get_value(expiration_days, Rule),
+    NonCurrentExpirationDays =
+        proplists:get_value(non_current_version_expiration_days, Rule),
+
+    EncodedRule =
+        {'Rule',
+         [
+          {'ID', [Id]},
+          {'Status', [Status]},
+          {'Filter', [Filter]},
+          {'Expiration', [{'Days', [ExpirationDays]}]},
+          {'NoncurrentVersionExpiration',
+           [{'NoncurrentDays', [NonCurrentExpirationDays]}]
+          }
+         ]
+        },
+    encode_lifecycle_rules(Rules, [EncodedRule | Encoded]).
+
 s3_simple_request(Config, Method, Host, Path, Subresource, Params, POSTData, Headers) ->
     case s3_request(Config, Method, Host, Path,
                     Subresource, Params, POSTData, Headers) of
@@ -980,3 +1075,186 @@ default_config() ->
         false ->
             throw({error, missing_s3_defaults})
     end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+decode_bucket_lifecycle_policy_test_() ->
+    Conf =
+        #xmlElement{
+           name = 'LifecycleConfiguration',
+           expanded_name = 'LifecycleConfiguration', nsinfo = [],
+           namespace = #xmlNamespace{default = [], nodes = []},
+           parents = [],
+           pos = 1,
+           attributes = [],
+           content =
+               [
+                #xmlElement{
+                   name = 'Rule', expanded_name = 'Rule',
+                   nsinfo = [],
+                   namespace = #xmlNamespace{default = [], nodes = []},
+                   parents = [{'LifecycleConfiguration', 1}],
+                   pos = 1, attributes = [],
+                   content =
+                       [
+                        #xmlElement{
+                           name = 'ID', expanded_name = 'ID',
+                           nsinfo = [],
+                           namespace = #xmlNamespace{
+                                          default = [], nodes = []},
+                           parents = [{'Rule', 1}, {'LifecycleConfiguration', 1}],
+                           pos = 1, attributes = [],
+                           content =
+                               [
+                                #xmlText{
+                                   parents = [{'ID', 1},
+                                              {'Rule', 1},
+                                              {'LifecycleConfiguration', 1}],
+                                   pos = 1,
+                                   language = [],
+                                   value = "pre-commit TTL",
+                                   type = text}
+                               ],
+                           language = [],
+                           xmlbase = "/kivra/code/mini_s3",
+                           elementdef = undeclared
+                          },
+                        #xmlElement{
+                           name = 'Status',
+                           expanded_name = 'Status',
+                           nsinfo = [],
+                           namespace = #xmlNamespace{default = [], nodes = []},
+                           parents = [{'Rule', 1}, {'LifecycleConfiguration', 1}],
+                           pos = 2,
+                           attributes = [],
+                           content =
+                               [
+                                #xmlText{
+                                   parents = [{'Status', 2},
+                                              {'Rule', 1},
+                                              {'LifecycleConfiguration', 1}],
+                                   pos = 1,
+                                   language = [],
+                                   value = "Enabled",
+                                   type = text}
+                               ],
+                           language = [],
+                           xmlbase = undefined,
+                           elementdef = undeclared
+                          },
+                        #xmlElement{
+                           name = 'Filter',
+                           expanded_name = 'Filter',
+                           nsinfo = [],
+                           namespace = #xmlNamespace{default = [], nodes = []},
+                           parents = [{'Rule', 1}, {'LifecycleConfiguration', 1}],
+                           pos = 3,
+                           attributes = [],
+                           content = [],
+                           language = [],
+                           xmlbase = undefined,
+                           elementdef = undeclared
+                          },
+                        #xmlElement{
+                           name = 'Expiration',
+                           expanded_name = 'Expiration',
+                           nsinfo = [],
+                           namespace = #xmlNamespace{default = [], nodes = []},
+                           parents = [{'Rule', 1}, {'LifecycleConfiguration', 1}],
+                           pos = 4,
+                           attributes = [],
+                           content =
+                               [
+                                #xmlElement{
+                                   name = 'Days',
+                                   expanded_name = 'Days',
+                                   nsinfo = [],
+                                   namespace = #xmlNamespace{default = [], nodes = []},
+                                   parents = [{'Expiration', 4},
+                                              {'Rule', 1},
+                                              {'LifecycleConfiguration', 1}],
+                                   pos = 1,
+                                   attributes = [],
+                                   content = [
+                                              #xmlText{
+                                                 parents = [{'Days', 1},
+                                                            {'Expiration', 4},
+                                                            {'Rule', 1},
+                                                            {'LifecycleConfiguration', 1}],
+                                                 pos = 1,
+                                                 language = [],
+                                                 value = "30",
+                                                 type = text
+                                                }
+                                             ],
+                                   language = [],
+                                   xmlbase = undefined,
+                                   elementdef = undeclared}
+                               ],
+                           language = [],
+                           xmlbase = undefined,
+                           elementdef = undeclared
+                          },
+                        #xmlElement{
+                           name = 'NoncurrentVersionExpiration',
+                           expanded_name = 'NoncurrentVersionExpiration',
+                           nsinfo = [],
+                           namespace = #xmlNamespace{default = [], nodes = []},
+                           parents = [{'Rule', 1}, {'LifecycleConfiguration', 1}],
+                           pos = 5,
+                           attributes = [],
+                           content =
+                               [
+                                #xmlElement{
+                                   name = 'NoncurrentDays',
+                                   expanded_name = 'NoncurrentDays',
+                                   nsinfo = [],
+                                   namespace = #xmlNamespace{default = [], nodes = []},
+                                   parents = [{'NoncurrentVersionExpiration', 5},
+                                              {'Rule', 1},
+                                              {'LifecycleConfiguration', 1}],
+                                   pos = 1,
+                                   attributes = [],
+                                   content =
+                                       [
+                                        #xmlText{
+                                           parents = [{'NoncurrentDays', 1},
+                                                      {'NoncurrentVersionExpiration', 5},
+                                                      {'Rule', 1},
+                                                      {'LifecycleConfiguration', 1}],
+                                           pos = 1,
+                                           language = [],
+                                           value = "30",
+                                           type = text
+                                          }
+                                       ],
+                                   language = [],
+                                   xmlbase = undefined,
+                                   elementdef = undeclared
+                                  }
+                               ],
+                           language = [],
+                           xmlbase = undefined,
+                           elementdef = undeclared
+                          }
+                       ],
+                   language = [],
+                   xmlbase = "/kivra/code/mini_s3",
+                   elementdef = undeclared
+                  }
+               ],
+           language = [],
+           xmlbase = "/kivra/code/mini_s3",
+           elementdef = undeclared
+          },
+
+    Decoded = [[{id, "pre-commit TTL"},
+                {status, "Enabled"},
+                {filter, []},
+                {expiration_days, "30"},
+                {non_current_version_expiration_days, "30"}]],
+
+    ?_assertEqual(Decoded, decode_lifecycle_config(Conf)).
+
+-endif.
