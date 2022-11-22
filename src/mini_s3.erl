@@ -474,27 +474,27 @@ set_bucket_attribute(BucketName, AttributeName, Value) ->
 set_bucket_attribute(BucketName, AttributeName, Value, Config) ->
     erlcloud_s3:set_bucket_attribute(BucketName, AttributeName, Value, Config).
 
--spec get_bucket_lifecycle(string()) -> [bucket_lifecycle_rule()].
+-spec get_bucket_lifecycle(string()) -> {ok, [bucket_lifecycle_rule()]} | {error, term()}.
 get_bucket_lifecycle(BucketName) ->
     erlcloud_s3:get_bucket_lifecycle(BucketName).
 
--spec get_bucket_lifecycle(string(), aws_config()) -> [bucket_lifecycle_rule()].
+-spec get_bucket_lifecycle(string(), aws_config()) -> {ok, [bucket_lifecycle_rule()]} | {error, term()}.
 get_bucket_lifecycle(BucketName, Config) ->
     erlcloud_s3:get_bucket_lifecycle(BucketName, Config).
 
--spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()]) -> term().
+-spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()]) -> ok | {error, term()}.
 put_bucket_lifecycle(BucketName, Rules) ->
     erlcloud_s3:put_bucket_lifecycle(BucketName, Rules).
 
--spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()], aws_config()) -> term().
+-spec put_bucket_lifecycle(string(), [bucket_lifecycle_rule()], aws_config()) -> ok | {error, term()}.
 put_bucket_lifecycle(BucketName, Rules, Config) ->
     erlcloud_s3:put_bucket_lifecycle(BucketName, Rules, Config).
 
--spec delete_bucket_lifecycle(string()) -> term().
+-spec delete_bucket_lifecycle(string()) -> ok | {error, term()}.
 delete_bucket_lifecycle(BucketName) ->
     erlcloud_s3:delete_bucket_lifecycle(BucketName).
 
--spec delete_bucket_lifecycle(string(), aws_config()) -> term().
+-spec delete_bucket_lifecycle(string(), aws_config()) -> ok | {error, term()}.
 delete_bucket_lifecycle(BucketName, Config) ->
     erlcloud_s3:delete_bucket_lifecycle(BucketName, Config).
 
